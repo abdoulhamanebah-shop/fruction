@@ -2,10 +2,11 @@ import { useState, useEffect } from 'react';
 import io from 'socket.io-client';
 import './App.css';
 
+// Connexion au serveur
 const socket = io.connect(import.meta.env.VITE_SERVER_URL || "http://localhost:3001");
 
 function App() {
-  // --- ÉTATS AUTHENTIFICATION ---
+  // --- ÉTATS ---
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isRegisterMode, setIsRegisterMode] = useState(false);
   const [authData, setAuthData] = useState({ email: '', password: '', username: '' });
@@ -13,21 +14,15 @@ function App() {
   const [authSuccess, setAuthSuccess] = useState('');
   const [currentUser, setCurrentUser] = useState('');
 
-  // --- ÉTATS CHAT ---
   const [allUsers, setAllUsers] = useState([]); 
   const [onlineUsers, setOnlineUsers] = useState([]); 
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedUser, setSelectedUser] = useState(null);
   const [messageList, setMessageList] = useState([]);
   const [message, setMessage] = useState("");
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Pour Mobile
 
-  // --- ÉTAT MOBILE (MENU HAMBURGER) ---
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-
-  const toggleSidebar = () => {
-    setIsSidebarOpen(!isSidebarOpen);
-  };
-
+  // --- LOGIQUE AUTH ---
   useEffect(() => {
     socket.emit('get_all_users');
     
@@ -87,6 +82,7 @@ function App() {
     }
   };
 
+  // --- LOGIQUE CHAT ---
   useEffect(() => {
     if (selectedUser) {
       socket.emit("get_history", { sender: currentUser, receiver: selectedUser.username });
@@ -126,6 +122,15 @@ function App() {
   const filteredUsers = allUsers.filter((u) => 
     u.username.toLowerCase().includes(searchTerm.toLowerCase()) && u.username !== currentUser
   );
+
+  const toggleSidebar = () => {
+      setIsSidebarOpen(!isSidebarOpen);
+  }
+
+  const handleSelectUser = (user) => {
+      setSelectedUser(user);
+      setIsSidebarOpen(false); // Fermer le menu mobile après sélection
+  };
 
   return (
     <div className="app-container">
@@ -186,16 +191,65 @@ function App() {
       {isAuthenticated && (
         <div className="main-layout">
           
-          {/* --- BOUTON HAMBURGER (Visible sur Mobile quand chat ouvert) --- */}
-          {(selectedUser) && (
-            <button className="hamburger" onClick={toggleSidebar}>
-              <span className="bar"></span>
-              <span className="bar"></span>
-              <span className="bar"></span>
-            </button>
+          {/* BOUTON HAMBURGER (Visible seulement sur Mobile) */}
+          <button className="hamburger" onClick={toggleSidebar}>
+            <span className="bar"></span>
+            <span className="bar"></span>
+            <span className="bar"></span>
+          </button>
+
+          {/* --- BOUTON RETOUR (Visible sur Mobile quand chat ouvert) --- */}
+          {selectedUser && (
+             <button className="mobile-back-btn" onClick={() => setSelectedUser(null)}>← Retour</button>
           )}
 
-          {/* --- ZONE DE CHAT --- */}
+          {/* --- SIDEBAR (Contacts) --- */}
+          <div className={`sidebar ${isSidebarOpen ? 'mobile-open' : ''}`}>
+            <div className="sidebar-header">
+              <h1>Fruction</h1>
+              <div className="user-badge">{currentUser}</div>
+            </div>
+
+            <div className="search-container">
+              <input 
+                type="text" 
+                placeholder="Rechercher..." 
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+
+            <div className="contacts-list">
+              {filteredUsers.length === 0 && <p className="no-contacts">Aucun contact enregistré...</p>}
+              {filteredUsers.map((user, index) => {
+                const isOnline = onlineUsers.some(u => u.username === user.username);
+
+                return (
+                  <div 
+                    key={index} 
+                    className={`contact-item ${selectedUser && selectedUser.username === user.username ? 'active' : ''}`}
+                    onClick={() => handleSelectUser(user)}
+                  >
+                    <div className="avatar">
+                        {user.username[0].toUpperCase()}
+                        {isOnline && <span className="online-dot"></span>}
+                    </div>
+                    <div className="contact-info">
+                      <strong>{user.username}</strong>
+                      <span>{isOnline ? "En ligne" : "Hors ligne"}</span>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+            
+            {/* BOUTON FERMER (Mobile) */}
+            <div className="close-sidebar" onClick={toggleSidebar}>
+              ✕
+            </div>
+          </div>
+
+          {/* --- CHAT AREA --- */}
           <div className="chat-area">
             {selectedUser ? (
               <>
@@ -227,55 +281,19 @@ function App() {
                 </div>
               </>
             ) : (
+              /* ÉTAT VIDE : PAS DE CONTACT SÉLECTIONNÉ */
               <div className="no-chat-selected">
+                {/* SUR MOBILE : Si la sidebar est fermée, on montre le bouton pour l'ouvrir */}
+                {!isSidebarOpen && (
+                    <div className="see-contacts-mobile" onClick={toggleSidebar}>
+                        👁 Voir les contacts
+                    </div>
+                )}
+                
                 <h1>Fruction</h1>
                 <p>Sélectionnez une conversation.</p>
               </div>
             )}
-          </div>
-
-          {/* --- MENU HAMBURGER (SLIDE-IN) --- */}
-          <div className={`mobile-sidebar-overlay ${isSidebarOpen ? 'open' : ''}`} onClick={toggleSidebar}>
-            <div className="sidebar-content" onClick={(e) => e.stopPropagation()}>
-                <div className="sidebar-header">
-                  <h1>Fruction</h1>
-                  <div className="user-badge">{currentUser}</div>
-                  {/* Bouton fermer */}
-                  <div className="close-sidebar" onClick={toggleSidebar}>✕</div>
-                </div>
-
-                <div className="search-container">
-                  <input 
-                    type="text" 
-                    placeholder="Rechercher..." 
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                  />
-                </div>
-
-                <div className="contacts-list">
-                  {filteredUsers.map((user, index) => {
-                    const isOnline = onlineUsers.some(u => u.username === user.username);
-
-                    return (
-                      <div 
-                        key={index} 
-                        className={`contact-item ${selectedUser && selectedUser.username === user.username ? 'active' : ''}`}
-                        onClick={() => { setSelectedUser(user); setIsSidebarOpen(false); }}
-                      >
-                        <div className="avatar">
-                            {user.username[0].toUpperCase()}
-                            {isOnline && <span className="online-dot"></span>}
-                        </div>
-                        <div className="contact-info">
-                          <strong>{user.username}</strong>
-                          <span>{isOnline ? "En ligne" : "Hors ligne"}</span>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-            </div>
           </div>
         </div>
       )}
