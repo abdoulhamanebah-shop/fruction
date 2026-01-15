@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import io from 'socket.io-client';
 import './App.css';
 
-// Connexion au serveur (en production ou local)
 const socket = io.connect(import.meta.env.VITE_SERVER_URL || "http://localhost:3001");
 
 function App() {
@@ -22,7 +21,13 @@ function App() {
   const [messageList, setMessageList] = useState([]);
   const [message, setMessage] = useState("");
 
-  // 1. Gestion de l'utilisateur et de la liste
+  // --- ÉTAT MOBILE (MENU HAMBURGER) ---
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  const toggleSidebar = () => {
+    setIsSidebarOpen(!isSidebarOpen);
+  };
+
   useEffect(() => {
     socket.emit('get_all_users');
     
@@ -82,7 +87,6 @@ function App() {
     }
   };
 
-  // 2. Charger l'historique quand on change de contact
   useEffect(() => {
     if (selectedUser) {
       socket.emit("get_history", { sender: currentUser, receiver: selectedUser.username });
@@ -96,7 +100,6 @@ function App() {
     return () => { socket.off("load_history"); };
   }, []);
 
-  // 3. Envoyer message
   const sendMessage = async () => {
     if (message !== "" && selectedUser) {
       const messageData = {
@@ -120,7 +123,6 @@ function App() {
     });
   }, [socket, selectedUser]);
 
-  // 4. Filtre pour la recherche
   const filteredUsers = allUsers.filter((u) => 
     u.username.toLowerCase().includes(searchTerm.toLowerCase()) && u.username !== currentUser
   );
@@ -184,55 +186,20 @@ function App() {
       {isAuthenticated && (
         <div className="main-layout">
           
-          {/* SIDEBAR (LISTE DES CONTACTS) */}
-          <div className="sidebar">
-            <div className="sidebar-header">
-              <h1>Fruction</h1>
-              <div className="user-badge">{currentUser}</div>
-            </div>
+          {/* --- BOUTON HAMBURGER (Visible sur Mobile quand chat ouvert) --- */}
+          {(selectedUser) && (
+            <button className="hamburger" onClick={toggleSidebar}>
+              <span className="bar"></span>
+              <span className="bar"></span>
+              <span className="bar"></span>
+            </button>
+          )}
 
-            <div className="search-container">
-              <input 
-                type="text" 
-                placeholder="Rechercher..." 
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-
-            <div className="contacts-list">
-              {filteredUsers.length === 0 && <p className="no-contacts">Aucun contact enregistré...</p>}
-              {filteredUsers.map((user, index) => {
-                const isOnline = onlineUsers.some(u => u.username === user.username);
-
-                return (
-                  <div 
-                    key={index} 
-                    className={`contact-item ${selectedUser && selectedUser.username === user.username ? 'active' : ''}`}
-                    onClick={() => setSelectedUser(user)}
-                  >
-                    <div className="avatar">
-                        {user.username[0].toUpperCase()}
-                        {isOnline && <span className="online-dot"></span>}
-                    </div>
-                    <div className="contact-info">
-                      <strong>{user.username}</strong>
-                      <span>{isOnline ? "En ligne" : "Hors ligne"}</span>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-
-          {/* ZONE DE CHAT */}
+          {/* --- ZONE DE CHAT --- */}
           <div className="chat-area">
             {selectedUser ? (
               <>
                 <header className="chat-header">
-                  {/* Bouton Retour pour Mobile */}
-                  <button className="mobile-back-btn" onClick={() => setSelectedUser(null)}>←</button>
-                  
                   <div className="header-avatar">{selectedUser.username[0].toUpperCase()}</div>
                   <div className="header-info">
                     <h3>{selectedUser.username}</h3>
@@ -265,6 +232,50 @@ function App() {
                 <p>Sélectionnez une conversation.</p>
               </div>
             )}
+          </div>
+
+          {/* --- MENU HAMBURGER (SLIDE-IN) --- */}
+          <div className={`mobile-sidebar-overlay ${isSidebarOpen ? 'open' : ''}`} onClick={toggleSidebar}>
+            <div className="sidebar-content" onClick={(e) => e.stopPropagation()}>
+                <div className="sidebar-header">
+                  <h1>Fruction</h1>
+                  <div className="user-badge">{currentUser}</div>
+                  {/* Bouton fermer */}
+                  <div className="close-sidebar" onClick={toggleSidebar}>✕</div>
+                </div>
+
+                <div className="search-container">
+                  <input 
+                    type="text" 
+                    placeholder="Rechercher..." 
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                </div>
+
+                <div className="contacts-list">
+                  {filteredUsers.map((user, index) => {
+                    const isOnline = onlineUsers.some(u => u.username === user.username);
+
+                    return (
+                      <div 
+                        key={index} 
+                        className={`contact-item ${selectedUser && selectedUser.username === user.username ? 'active' : ''}`}
+                        onClick={() => { setSelectedUser(user); setIsSidebarOpen(false); }}
+                      >
+                        <div className="avatar">
+                            {user.username[0].toUpperCase()}
+                            {isOnline && <span className="online-dot"></span>}
+                        </div>
+                        <div className="contact-info">
+                          <strong>{user.username}</strong>
+                          <span>{isOnline ? "En ligne" : "Hors ligne"}</span>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+            </div>
           </div>
         </div>
       )}
