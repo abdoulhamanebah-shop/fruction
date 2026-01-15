@@ -2,9 +2,11 @@ import { useState, useEffect } from 'react';
 import io from 'socket.io-client';
 import './App.css';
 
+// Connexion au serveur (en production ou local)
 const socket = io.connect(import.meta.env.VITE_SERVER_URL || "http://localhost:3001");
 
 function App() {
+  // --- ÉTATS AUTHENTIFICATION ---
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isRegisterMode, setIsRegisterMode] = useState(false);
   const [authData, setAuthData] = useState({ email: '', password: '', username: '' });
@@ -12,6 +14,7 @@ function App() {
   const [authSuccess, setAuthSuccess] = useState('');
   const [currentUser, setCurrentUser] = useState('');
 
+  // --- ÉTATS CHAT ---
   const [allUsers, setAllUsers] = useState([]); 
   const [onlineUsers, setOnlineUsers] = useState([]); 
   const [searchTerm, setSearchTerm] = useState("");
@@ -19,6 +22,7 @@ function App() {
   const [messageList, setMessageList] = useState([]);
   const [message, setMessage] = useState("");
 
+  // 1. Gestion de l'utilisateur et de la liste
   useEffect(() => {
     socket.emit('get_all_users');
     
@@ -78,6 +82,7 @@ function App() {
     }
   };
 
+  // 2. Charger l'historique quand on change de contact
   useEffect(() => {
     if (selectedUser) {
       socket.emit("get_history", { sender: currentUser, receiver: selectedUser.username });
@@ -91,6 +96,7 @@ function App() {
     return () => { socket.off("load_history"); };
   }, []);
 
+  // 3. Envoyer message
   const sendMessage = async () => {
     if (message !== "" && selectedUser) {
       const messageData = {
@@ -114,6 +120,7 @@ function App() {
     });
   }, [socket, selectedUser]);
 
+  // 4. Filtre pour la recherche
   const filteredUsers = allUsers.filter((u) => 
     u.username.toLowerCase().includes(searchTerm.toLowerCase()) && u.username !== currentUser
   );
@@ -121,6 +128,7 @@ function App() {
   return (
     <div className="app-container">
       
+      {/* --- ÉCRAN DE CONNEXION --- */}
       {!isAuthenticated && (
         <div className="auth-container">
             <div className="auth-box">
@@ -172,9 +180,11 @@ function App() {
         </div>
       )}
 
+      {/* --- INTERFACE PRINCIPALE --- */}
       {isAuthenticated && (
         <div className="main-layout">
           
+          {/* SIDEBAR (LISTE DES CONTACTS) */}
           <div className="sidebar">
             <div className="sidebar-header">
               <h1>Fruction</h1>
@@ -215,10 +225,14 @@ function App() {
             </div>
           </div>
 
+          {/* ZONE DE CHAT */}
           <div className="chat-area">
             {selectedUser ? (
               <>
                 <header className="chat-header">
+                  {/* Bouton Retour pour Mobile */}
+                  <button className="mobile-back-btn" onClick={() => setSelectedUser(null)}>←</button>
+                  
                   <div className="header-avatar">{selectedUser.username[0].toUpperCase()}</div>
                   <div className="header-info">
                     <h3>{selectedUser.username}</h3>
